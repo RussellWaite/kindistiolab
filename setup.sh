@@ -64,21 +64,23 @@ kubectl apply -f samples/bookinfo/networking/bookinfo-gateway.yaml
 
 # install helm into the cluster (I'm not a fan but it makes things a bit easier for now)
 # this needs the helm client installed locally...
-kubectl -n kube-system create serviceaccount tiller
-kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
-kubectl patch deploy --namespace kube-system tiller-deploy -p '{"spec":{"template":{"spec":{"serviceAccount":"tiller"}}}}'      
-helm init --service-account tiller --upgrade
-
-# create openfaas namespaces (just running something fresh from the internet in my local cluster, no reason to ... PANIC!!!)
-kubectl apply -f https://raw.githubusercontent.com/openfaas/faas-netes/master/namespaces.yml
-kubectl get namespaces --show-labels
-
 if ! hash helm 2>/dev/null; then
     export HELM_TAR="helm-v2.14.3-linux-amd64.tar.gz"
     curl https://get.helm.sh/$HELM_TAR --output $HELM_TAR
     tar -zxvf $HELM_TAR
     sudo mv linux-amd64/helm /usr/local/bin/helm
 fi
+kubectl -n kube-system create serviceaccount tiller
+kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
+kubectl patch deploy --namespace kube-system tiller-deploy -p '{"spec":{"template":{"spec":{"serviceAccount":"tiller"}}}}'
+
+until kubectl get pod -l app=helm -l name=tiller -n kube-system | grep -m 1 "Running"; do sleep 1 ; done
+helm init --service-account tiller --upgrade
+
+# create openfaas namespaces (just running something fresh from the internet in my local cluster, no reason to ... PANIC!!!)
+kubectl apply -f https://raw.githubusercontent.com/openfaas/faas-netes/master/namespaces.yml
+kubectl get namespaces --show-labels
+
 
 # and again - install blind from internet - HELM - magic... (oh, this is openfaas install by the way)
 helm repo add openfaas https://openfaas.github.io/faas-netes/
@@ -86,3 +88,5 @@ export OF_PASSWORD=$(head -c 12 /dev/urandom | shasum| cut -d' ' -f1)
 kubectl -n openfaas create secret generic basic-auth --from-literal=basic-auth-user=admin --from-literal=basic-auth-password="$OF_PASSWORD"
 helm repo update
 helm upgrade openfaas --install openfaas/openfaas --namespace openfaas --set basic_auth=true --set functionNamespace=openfaas-fn
+
+kubectl --namespace=openfaas get deployments -l "release=openfaas, app=openfaas"
