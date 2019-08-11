@@ -1,11 +1,17 @@
 #! zsh
 
 export ISTIO_VERSION="1.2.2"
-
 export ISTIO_FOLDER="istio-$ISTIO_VERSION"
 
-kind delete cluster --name kind
+# install kind if not present
+if ! hash kind 2>/dev/null; then
+    GO111MODULE="on" go get sigs.k8s.io/kind@v0.4.0
+fi
 
+until command -v kind>/dev/null; do sleep 1 ; done
+
+# clean old cluster then create new one
+kind delete cluster --name kind
 kind create cluster --config ./one_worker.yaml
 
 export KUBECONFIG="$(kind get kubeconfig-path --name="kind")"
@@ -15,10 +21,19 @@ kubectl cluster-info
 [[ ! -d "./$ISTIO_FOLDER" ]] && curl -L https://git.io/getLatestIstio | sh -
 
 
-# install istio - without helm
+# this repeadedly calls a command until it sees the desired output
+#until my_cmd | grep -m 1 "String Im Looking For"; do : ; done
+
+# this would just sit and wait, watching the output
+#watch -e "! my_cmd | grep -m 1 \"String Im Looking For\""
+
+# install istio - without helm (seems pointless now as helm's being installed a little later on...)
+until [ -d "$ISTIO_FOLDER" ]; do sleep 1; done
 cd $ISTIO_FOLDER
 # CRDs for istio
 for i in install/kubernetes/helm/istio-init/files/crd*yaml; do kubectl apply -f $i; done
+
+# TODO: what to wait on here? do we even need to?
 
 kubectl label namespace default istio-injection=enabled
 
@@ -34,9 +49,13 @@ export SECURE_INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressga
 export GATEWAY_URL=$INGRESS_HOST:$INGRESS_PORT
 
 #setup port forwarding for istio tools kiali, prometheus, grafana, jaegar
+until kubectl get pod -l app=kiali -n istio-system | grep -m 1 "Running"; do sleep 1 ; done
 kubectl port-forward -n istio-system svc/kiali 20001:20001 &
+until kubectl get pod -l app=grafana -n istio-system | grep -m 1 "Running"; do sleep 1 ; done
 kubectl port-forward -n istio-system svc/grafana 3000:3000 &
+until kubectl get pod -l app=prometheus -n istio-system | grep -m 1 "Running"; do sleep 1 ; done
 kubectl port-forward -n istio-system svc/prometheus 9090:9090 &
+until kubectl get pod -l app=jaeger -n istio-system | grep -m 1 "Running"; do sleep 1 ; done
 kubectl port-forward -n istio-system svc/tracing 10080:80 &
 
 #install bookinfo demo
@@ -53,6 +72,13 @@ helm init --service-account tiller --upgrade
 # create openfaas namespaces (just running something fresh from the internet in my local cluster, no reason to ... PANIC!!!)
 kubectl apply -f https://raw.githubusercontent.com/openfaas/faas-netes/master/namespaces.yml
 kubectl get namespaces --show-labels
+
+if ! hash helm 2>/dev/null; then
+    export HELM_TAR="helm-v2.14.3-linux-amd64.tar.gz"
+    curl https://get.helm.sh/$HELM_TAR --output $HELM_TAR
+    tar -zxvf $HELM_TAR
+    sudo mv linux-amd64/helm /usr/local/bin/helm
+fi
 
 # and again - install blind from internet - HELM - magic... (oh, this is openfaas install by the way)
 helm repo add openfaas https://openfaas.github.io/faas-netes/
