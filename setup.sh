@@ -1,3 +1,28 @@
+# set env vars for usage - this controls external access, port forwarding ports, and istio version
+export KIALI_PORT=20001
+export GRAFANA_PORT=3000
+export PROMETHEUS_PORT=9090
+export JAEGER_PORT=10080
+export OPENFAAS_PORT=31112
+
+# change this to something other than 1 to prevent external access and firewall holes being created
+set SHOULD_ALLOW_EXTERNAL_ACCESS=1
+
+if $SHOULD_ALLOW_EXTERNAL_ACCESS == 1; then
+    export PORT_FWD_IP=0.0.0.0
+    sudo ufw allow $KIALI_PORT
+    sudo ufw allow $GRAFANA_PORT
+    sudo ufw allow $PROMETHEUS_PORT
+    sudo ufw allow $JAEGER_PORT
+    sudo ufw allow $OPENFAAS_PORT
+else
+    export PORT_FWD_IP=127.0.0.1
+fi
+
+export ISTIO_VERSION="1.2.2"
+export ISTIO_FOLDER="istio-$ISTIO_VERSION"
+
+#---------------------------------------------------------------------------------------
 # install kind if not present
 if ! hash kind 2>/dev/null; then
     GO111MODULE="on" go get sigs.k8s.io/kind@v0.4.0
@@ -13,8 +38,6 @@ export KUBECONFIG="$(kind get kubeconfig-path --name="kind")"
 kubectl cluster-info
 
 #---------------------------------------------------------------------------------------
-export ISTIO_VERSION="1.2.2"
-export ISTIO_FOLDER="istio-$ISTIO_VERSION"
 
 # download istio if required
 [[ ! -d "./$ISTIO_FOLDER" ]] && curl -L https://git.io/getLatestIstio | sh -
@@ -27,6 +50,7 @@ export ISTIO_FOLDER="istio-$ISTIO_VERSION"
 #watch -e "! my_cmd | grep -m 1 \"String Im Looking For\""
 
 # install istio - without helm (seems pointless now as helm's being installed a little later on...)
+echo "Waiting for Istio to be downloaded..."
 until [ -d "$ISTIO_FOLDER" ]; do sleep 1; done
 
 # CRDs for istio
@@ -47,18 +71,25 @@ export INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -
 export SECURE_INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}')
 export GATEWAY_URL=$INGRESS_HOST:$INGRESS_PORT
 
-export PORT_FWD_IP=0.0.0.0 # 127.0.0.1
+
 
 #setup port forwarding for istio tools kiali, prometheus, grafana, jaegar - MASSIVELY insecure thanks to me binding to all IPS using 0.0.0.0
 # you'll need to allow these ports through if you want to go out of the bow - sudo ufw allow <port> e.g. sudo ufw allow 20001
+echo "Waiting for Kiali pod to be ready..."
 until kubectl get pod -l app=kiali -n istio-system | grep -m 1 "Running"; do sleep 1 ; done
-kubectl port-forward -n istio-system svc/kiali 20001:20001 --address $PORT_FWD_IP &
+kubectl port-forward -n istio-system svc/kiali $KIALI_PORT:20001 --address $PORT_FWD_IP &
+
+echo "Waiting for Grafana pod to be ready..."
 until kubectl get pod -l app=grafana -n istio-system | grep -m 1 "Running"; do sleep 1 ; done
-kubectl port-forward -n istio-system svc/grafana 3000:3000 --address $PORT_FWD_IP &
+kubectl port-forward -n istio-system svc/grafana $GRAFANA_PORT:3000 --address $PORT_FWD_IP &
+
+echo "Waiting for Prometheus pod to be ready..."
 until kubectl get pod -l app=prometheus -n istio-system | grep -m 1 "Running"; do sleep 1 ; done
-kubectl port-forward -n istio-system svc/prometheus 9090:9090 --address $PORT_FWD_IP &
+kubectl port-forward -n istio-system svc/prometheus $PROMETHEUS_PORT:9090 --address $PORT_FWD_IP &
+
+echo "Waiting for Jaeger pod to be ready..."
 until kubectl get pod -l app=jaeger -n istio-system | grep -m 1 "Running"; do sleep 1 ; done
-kubectl port-forward -n istio-system svc/tracing 10080:80 --address $PORT_FWD_IP &
+kubectl port-forward -n istio-system svc/tracing $JAEGER_PORT:80 --address $PORT_FWD_IP &
 
 #install istio bookinfo demo
 kubectl apply -f $ISTIO_FOLDER/samples/bookinfo/platform/kube/bookinfo.yaml
@@ -89,20 +120,14 @@ helm repo add openfaas https://openfaas.github.io/faas-netes/
 export OF_PASSWORD=$(head -c 12 /dev/urandom | shasum| cut -d' ' -f1)
 kubectl -n openfaas create secret generic basic-auth --from-literal=basic-auth-user=admin --from-literal=basic-auth-password="$OF_PASSWORD"
 helm repo update
+
 echo "Waiting for tiller pod to come online..."
 until kubectl get pod -l app=helm -l name=tiller -n kube-system | grep -m 1 "1/1"; do sleep 1 ; done
 helm upgrade openfaas --install openfaas/openfaas --namespace openfaas --set basic_auth=true --set functionNamespace=openfaas-fn
 
 kubectl --namespace=openfaas get deployments -l "release=openfaas, app=openfaas"
 kubectl get svc -n openfaas gateway-external -o wide
+
 echo "Waiting for openfaas pod to come online..."
 until kubectl get pod -n openfaas -l app=gateway | grep -m 1 "Running"; do sleep 1 ; done
-kubectl port-forward -n openfaas svc/gateway 31112:31112 --address $PORT_FWD_IP 2>/dev/null &
-
-# allowing holes in the hosts firewall so externals can communicate with the port forwarded services 
-# here be dragons...
-# sudo ufw allow 20001
-# sudo ufw allow 3000
-# sudo ufw allow 9090
-# sudo ufw allow 10080
-# sudo ufw allow 31112
+kubectl port-forward -n openfaas svc/gateway $OPENFAAS_PORT:31112 --address $PORT_FWD_IP 2>/dev/null &
