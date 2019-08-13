@@ -5,10 +5,10 @@ export PROMETHEUS_PORT=9090
 export JAEGER_PORT=10080
 export OPENFAAS_PORT=31112
 
-# change this to something other than 1 to prevent external access and firewall holes being created
-set SHOULD_ALLOW_EXTERNAL_ACCESS=1
+# 0 prevents, 1 allows - external access and firewall holes being created
+export SHOULD_ALLOW_EXTERNAL_ACCESS=1
 
-if $SHOULD_ALLOW_EXTERNAL_ACCESS == 1; then
+if (($SHOULD_ALLOW_EXTERNAL_ACCESS)); then
     export PORT_FWD_IP=0.0.0.0
     sudo ufw allow $KIALI_PORT
     sudo ufw allow $GRAFANA_PORT
