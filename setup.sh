@@ -130,4 +130,4 @@ kubectl get svc -n openfaas gateway-external -o wide
 
 echo "Waiting for openfaas pod to come online..."
 until kubectl get pod -n openfaas -l app=gateway | grep -m 1 "Running"; do sleep 1 ; done
-kubectl port-forward -n openfaas svc/gateway $OPENFAAS_PORT:31112 --address $PORT_FWD_IP 2>/dev/null &
+kubectl port-forward -n openfaas svc/gateway $OPENFAAS_PORT:8080 --address $PORT_FWD_IP 2>/dev/null &
