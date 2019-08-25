@@ -6,7 +6,7 @@ export JAEGER_PORT=10080
 export OPENFAAS_PORT=31112
 
 # 0 prevents, 1 allows - external access and firewall holes being created
-export SHOULD_ALLOW_EXTERNAL_ACCESS=1
+export SHOULD_ALLOW_EXTERNAL_ACCESS=0
 
 if (($SHOULD_ALLOW_EXTERNAL_ACCESS)); then
     export PORT_FWD_IP=0.0.0.0
@@ -17,6 +17,12 @@ if (($SHOULD_ALLOW_EXTERNAL_ACCESS)); then
     sudo ufw allow $OPENFAAS_PORT
 else
     export PORT_FWD_IP=127.0.0.1
+    sudo ufw deny $KIALI_PORT
+    sudo ufw deny $GRAFANA_PORT
+    sudo ufw deny $PROMETHEUS_PORT
+    sudo ufw deny $JAEGER_PORT
+    sudo ufw deny $OPENFAAS_PORT
+
 fi
 
 export ISTIO_VERSION="1.2.2"
@@ -36,6 +42,16 @@ kind create cluster --config ./one_worker.yaml
 
 export KUBECONFIG="$(kind get kubeconfig-path --name="kind")"
 kubectl cluster-info
+
+export INDEX_FILE="image_list.txt"
+
+input=$INDEX_FILE
+while IFS= read -r line
+do
+echo "Loading $line image from the docker image cache... (docker images)"
+  kind load docker-image $line
+done < "$input"
+
 
 #---------------------------------------------------------------------------------------
 
@@ -118,12 +134,13 @@ kubectl get namespaces --show-labels
 # and again - install blind from internet - HELM - magic... (oh, this is openfaas install by the way)
 helm repo add openfaas https://openfaas.github.io/faas-netes/
 export OF_PASSWORD=$(head -c 12 /dev/urandom | shasum| cut -d' ' -f1)
+echo "If using OpenFaaS, this might come in handy $OF_PASSWORD"
 kubectl -n openfaas create secret generic basic-auth --from-literal=basic-auth-user=admin --from-literal=basic-auth-password="$OF_PASSWORD"
 helm repo update
 
 echo "Waiting for tiller pod to come online..."
 until kubectl get pod -l app=helm -l name=tiller -n kube-system | grep -m 1 "1/1"; do sleep 1 ; done
-helm upgrade openfaas --install openfaas/openfaas --namespace openfaas --set basic_auth=true --set functionNamespace=openfaas-fn
+helm upgrade openfaas --install openfaas/openfaas --namespace openfaas --set basic_auth=true --set functionNamespace=openfaas-fn --set "faasnetes.imagePullPolicy=IfNotPresent"
 
 kubectl --namespace=openfaas get deployments -l "release=openfaas, app=openfaas"
 kubectl get svc -n openfaas gateway-external -o wide
