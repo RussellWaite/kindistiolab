@@ -43,6 +43,7 @@ export KUBECONFIG="$(kind get kubeconfig-path --name="kind")"
 kubectl cluster-info
 
 export INDEX_FILE="image_list.txt"
+#export INDEX_FILE="load_from_internet.txt"
 
 input=$INDEX_FILE
 while IFS= read -r line
@@ -137,3 +138,13 @@ kubectl get svc -n openfaas gateway-external -o wide
 echo "Waiting for openfaas pod to come online..."
 until kubectl get pod -n openfaas -l app=gateway | grep -m 1 "Running"; do sleep 1 ; done
 kubectl port-forward -n openfaas svc/gateway $OPENFAAS_PORT:8080 --address $PORT_FWD_IP 2>/dev/null &
+
+
+echo "Installing NATS"
+kubectl create ns nats-io
+kubectl apply -f ./nats/00-prereqs.yaml
+kubectl apply -f ./nats/10-deployment.yaml
+echo "Confirming NATS installed"
+kubectl get crd
+
+
