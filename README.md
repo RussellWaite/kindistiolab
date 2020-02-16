@@ -32,4 +32,4 @@ Next up will be a CD system, my list of things to try include:
 - Jenkins-x
 - Spinnaker
 - Screwdriver
-- maybe Tekton - see super new though.
+- maybe Tekton - seems super new though.
