@@ -1,6 +1,3 @@
-docker.io/buoyantio/emojivoto-emoji-svc:v9
-docker.io/buoyantio/emojivoto-voting-svc:v9
-docker.io/buoyantio/emojivoto-web:v9
 docker.io/grafana/grafana:6.4.3
 docker.io/istio/citadel:1.4.4
 docker.io/istio/examples-bookinfo-details-v1:1.15.0
@@ -18,13 +15,7 @@ docker.io/istio/sidecar_injector:1.4.4
 docker.io/jaegertracing/all-in-one:1.14
 docker.io/kindest/kindnetd:0.5.4
 docker.io/prom/prometheus:v2.12.0
-docker.io/prom/prometheus:v2.15.2
 docker.io/rancher/local-path-provisioner:v0.0.12
-gcr.io/linkerd-io/controller:stable-2.7.0
-gcr.io/linkerd-io/grafana:stable-2.7.0
-gcr.io/linkerd-io/proxy-init:v1.3.1
-gcr.io/linkerd-io/proxy:stable-2.7.0
-gcr.io/linkerd-io/web:stable-2.7.0
 k8s.gcr.io/coredns:1.6.5
 k8s.gcr.io/debian-base:v2.0.0
 k8s.gcr.io/etcd:3.4.3-0

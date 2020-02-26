@@ -7,9 +7,10 @@ export OPENFAAS_PORT=31112
 
 # 0 prevents, 1 allows
 #mesh
-export SHOULD_INSTALL_ISTIO=1
-export SHOULD_INSTALL_ISTIO_DEMO=1
-export SHOULD_INSTALL_LINKERD=0
+export SHOULD_INSTALL_ISTIO=0
+export SHOULD_INSTALL_ISTIO_DEMO=0
+export SHOULD_INSTALL_LINKERD=1
+export SHOULD_INSTALL_LINKERD_DEMO=1 
 
 #serverless
 export SHOULD_INSTALL_OPENFAAS=0
@@ -47,7 +48,7 @@ else
 fi
 
 pathadd() {
-    if [ -d "$1" ] && [[ ":$PATH:" != *":$1:"* ]]; then
+    if [ -d "$1" ] && [ ":$PATH:" != *":$1:"* ]; then
         PATH="${PATH:+"$PATH:"}$1"
     fi
 }
@@ -81,8 +82,7 @@ if [ $SHOULD_INSTALL_ISTIO -eq 1 ]; then
 fi
 
 if [ $SHOULD_INSTALL_LINKERD -eq 1 ]; then
-    [[ ! -d "./$LINKERD_FOLDER" ]] && curl -L https://github.com/linkerd/linkerd2/releases/download/stable-$(LINKERD_VERSION)/linkerd2-cli-stable-$(LINKERD_VERSION)-linux | sh -
-    pathadd $HOME/.linkerd2/bin
+    ./install_linkerd.sh
 fi
 
 if [ $SHOULD_INSTALL_HELM_CLIENT -eq 1 ]; then
